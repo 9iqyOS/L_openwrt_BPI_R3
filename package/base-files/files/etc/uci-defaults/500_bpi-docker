@@ -1,0 +1,64 @@
+#!/bin/sh
+
+. /lib/functions.sh
+
+MOUNT_DIR=/data
+MOUNT_DISK=/dev/nvme0n1p1
+DOCKER_ROOT=${MOUNT_DIR}/docker_root/
+
+mount_nvme() {
+	nvme_uuid="$1"
+	mount_target="$2"
+	nvme_section=""
+	if [ -z $nvme_uuid ] ; then
+		echo "Error: nvme_uuid is null"
+		return
+	fi
+	reset_cb
+	handle_fstab() {
+		nvme_uuid="$2"
+	 	config_get uuid $1 uuid ""
+		if [ x"${uuid}" == x"${nvme_uuid}" ] ; then
+			nvme_section=$1
+		fi
+	}
+	config_load fstab
+	config_foreach handle_fstab mount $nvme_uuid
+
+	if [ -z $nvme_section ] ; then
+		echo "Error: $nvme_uuid is not found in fstab"
+		return
+	fi
+	#uci show fstab.$nvme_section
+	uci set fstab.$nvme_section.enabled=1
+	uci set fstab.$nvme_section.target=${mount_target}
+	uci commit
+
+	block mount
+}
+
+NVME_MOUNTED=$(mount | grep nvme | grep data)
+if [ -z "NVME_MOUNTED"  ] ; then
+    if [ ! -b ${MOUNT_DISK} ] ; then
+        exit 127
+    fi
+    DISK_UUID=$(blkid /dev/nvme0n1p1 -s UUID | awk -F\" '{print $2}')
+    if [ -z "DISK_UUID"  ] ; then
+        exit 127
+    fi
+    if [ ! -d ${MOUNT_DIR} ] ; then
+        mkdir -p ${MOUNT_DIR}
+    fi
+
+    mount_nvme ${DISK_UUID} ${MOUNT_DIR}
+fi
+
+if [ ! -d ${DOCKER_ROOT} ] ; then
+    mkdir -p ${DOCKER_ROOT}
+fi
+
+uci -q batch <<-EOF >/dev/null
+    set dockerd.globals.data_root='${DOCKER_ROOT}'
+    add_list dockerd.globals.registry_mirrors="https://registry.docker-cn.com"
+	commit dockerd
+EOF
