@@ -1,5 +1,7 @@
 #!/bin/sh
 
+# set -x
+
 . /lib/functions.sh
 
 MOUNT_DIR=/data
@@ -17,7 +19,7 @@ mount_nvme() {
 	reset_cb
 	handle_fstab() {
 		nvme_uuid="$2"
-	 	config_get uuid $1 uuid ""
+		config_get uuid $1 uuid ""
 		if [ x"${uuid}" == x"${nvme_uuid}" ] ; then
 			nvme_section=$1
 		fi
@@ -38,7 +40,7 @@ mount_nvme() {
 }
 
 NVME_MOUNTED=$(mount | grep nvme | grep data)
-if [ -z "NVME_MOUNTED"  ] ; then
+if [ -z "${NVME_MOUNTED}"  ] ; then
     if [ ! -b ${MOUNT_DISK} ] ; then
         exit 127
     fi
