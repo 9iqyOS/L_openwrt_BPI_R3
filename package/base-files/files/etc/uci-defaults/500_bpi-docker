@@ -61,6 +61,7 @@ fi
 
 uci -q batch <<-EOF >/dev/null
     set dockerd.globals.data_root='${DOCKER_ROOT}'
+    set dockerd.globals.iptables='0'
     add_list dockerd.globals.registry_mirrors="https://registry.docker-cn.com"
 	commit dockerd
 EOF
