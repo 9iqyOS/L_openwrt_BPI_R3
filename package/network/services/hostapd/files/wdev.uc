@@ -46,8 +46,8 @@ function iface_start(wdev)
 				push(cmd, key, wdev[key]);
 		system(cmd);
 	} else if (wdev.mode == "mesh") {
-		let cmd = [ "iw", "dev", ifname, "mesh", "join", ssid, "freq", wdev.freq, wdev.htmode ];
-		for (let key in [ "beacon-interval", "mcast-rate" ])
+		let cmd = [ "iw", "dev", ifname, "mesh", "join", wdev.ssid, "freq", wdev.freq, wdev.htmode ];
+		for (let key in [ "mcast-rate", "beacon-interval" ])
 			if (wdev[key])
 				push(cmd, key, wdev[key]);
 		system(cmd);

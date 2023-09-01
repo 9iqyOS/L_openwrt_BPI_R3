@@ -26,7 +26,7 @@ drv_mac80211_init_device_config() {
 	config_add_string tx_burst
 	config_add_string distance
 	config_add_int beacon_int chanbw frag rts
-	config_add_int rxantenna txantenna antenna_gain txpower min_tx_power
+	config_add_int rxantenna txantenna txpower min_tx_power
 	config_add_boolean noscan ht_coex acs_exclude_dfs background_radar
 	config_add_array ht_capab
 	config_add_array channels
@@ -491,8 +491,6 @@ $base_cfg
 
 EOF
 	json_select ..
-	radio_md5sum=$(md5sum $hostapd_conf_file | cut -d" " -f1)
-	echo "radio_config_id=${radio_md5sum}" >> $hostapd_conf_file
 }
 
 mac80211_hostapd_setup_bss() {
@@ -765,7 +763,7 @@ mac80211_prepare_iw_htmode() {
 
 mac80211_add_mesh_params() {
 	for var in $MP_CONFIG_INT $MP_CONFIG_BOOL $MP_CONFIG_STRING; do
-		eval "mp_val=\"\$var\""
+		eval "mp_val=\"\$$var\""
 		[ -n "$mp_val" ] && json_add_string "$var" "$mp_val"
 	done
 }
@@ -1082,20 +1080,24 @@ drv_mac80211_setup() {
 	json_get_vars \
 		phy macaddr path \
 		country chanbw distance \
-		txpower antenna_gain \
+		txpower \
 		rxantenna txantenna \
 		frag rts beacon_int:100 htmode
 	json_get_values basic_rate_list basic_rate
 	json_get_values scan_list scan_list
 	json_select ..
 
+	json_select data && {
+		json_get_var prev_rxantenna rxantenna
+		json_get_var prev_txantenna txantenna
+		json_select ..
+	}
+
 	find_phy || {
 		echo "Could not find PHY for device '$1'"
 		wireless_set_retry 0
 		return 1
 	}
-
-	wireless_set_data phy="$phy"
 
 	local wdev
 	local cwdev
@@ -1125,13 +1127,14 @@ drv_mac80211_setup() {
 	set_default rxantenna 0xffffffff
 	set_default txantenna 0xffffffff
 	set_default distance 0
-	set_default antenna_gain 0
 
 	[ "$txantenna" = "all" ] && txantenna=0xffffffff
 	[ "$rxantenna" = "all" ] && rxantenna=0xffffffff
 
+	[ "$rxantenna" = "$prev_rxantenna" -a "$txantenna" = "$prev_txantenna" ] || mac80211_reset_config "$phy"
+	wireless_set_data phy="$phy" txantenna="$txantenna" rxantenna="$rxantenna"
+
 	iw phy "$phy" set antenna $txantenna $rxantenna >/dev/null 2>&1
-	iw phy "$phy" set antenna_gain $antenna_gain >/dev/null 2>&1
 	iw phy "$phy" set distance "$distance" >/dev/null 2>&1
 
 	if [ -n "$txpower" ]; then
